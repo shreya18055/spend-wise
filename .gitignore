@@ -1,0 +1,22 @@
+# Node.js
+node_modules/
+dist/
+
+# Java / Maven
+**/target/
+*.class
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
