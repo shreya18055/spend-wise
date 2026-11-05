@@ -1,0 +1,53 @@
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:18
+    container_name: spendwise-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: spendwise
+      POSTGRES_USER: spendwise_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spendwise_user -d spendwise"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: spendwise-backend
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/spendwise
+      SPRING_DATASOURCE_USERNAME: spendwise_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # React Frontend served by Nginx
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spendwise-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
