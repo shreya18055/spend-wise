@@ -24,6 +24,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Checking installed tools..."
+
                     java -version
                     mvn -version
                     node --version
@@ -35,11 +36,18 @@ pipeline {
 
         stage('Backend Build and Test') {
             steps {
-                dir('backend') {
-                    sh '''
-                        echo "Building and testing Spring Boot backend..."
-                        mvn clean test
-                    '''
+                withCredentials([
+                    string(
+                        credentialsId: 'spendwise-db-password',
+                        variable: 'DB_PASSWORD'
+                    )
+                ]) {
+                    dir('backend') {
+                        sh '''
+                            echo "Building and testing Spring Boot backend..."
+                            mvn clean test
+                        '''
+                    }
                 }
             }
         }
@@ -60,6 +68,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Building backend Docker image..."
+
                     docker build \
                         -t spendwise-backend:${BUILD_NUMBER} \
                         -t spendwise-backend:latest \
@@ -72,6 +81,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Building frontend Docker image..."
+
                     docker build \
                         -t spendwise-frontend:${BUILD_NUMBER} \
                         -t spendwise-frontend:latest \
