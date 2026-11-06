@@ -3,43 +3,64 @@ pipeline {
     agent any
 
     environment {
-        // Java and Maven configuration
+        // Java 21 configuration
         JAVA_HOME = '/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home'
+
+        // Maven configuration
         MAVEN_HOME = '/opt/homebrew/Cellar/maven/3.10.0/libexec'
 
+        // Environment PATH
         PATH = "${JAVA_HOME}/bin:${MAVEN_HOME}/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-        // Azure Container Registry configuration
+        // Azure Container Registry
         ACR_LOGIN_SERVER = 'spendwiseacr2026.azurecr.io'
+
+        // Docker image names
         BACKEND_IMAGE = 'spendwiseacr2026.azurecr.io/spendwise-backend'
         FRONTEND_IMAGE = 'spendwiseacr2026.azurecr.io/spendwise-frontend'
     }
 
     stages {
 
+        // Stage 1: Checkout source code
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // Stage 2: Verify installed tools
         stage('Check Tools') {
             steps {
                 sh '''
-                    echo "Checking development environment..."
+                    echo "=================================="
+                    echo "CHECKING DEVELOPMENT ENVIRONMENT"
+                    echo "=================================="
 
                     echo "JAVA_HOME=$JAVA_HOME"
                     echo "MAVEN_HOME=$MAVEN_HOME"
 
+                    echo "Java version:"
                     java -version
+
+                    echo "Maven version:"
                     mvn -version
-                    node -version
-                    npm -version
+
+                    echo "Node.js version:"
+                    node --version
+
+                    echo "NPM version:"
+                    npm --version
+
+                    echo "Docker version:"
                     docker --version
+
+                    echo "All tools checked successfully."
                 '''
             }
         }
 
+        // Stage 3: Build and test Spring Boot backend
         stage('Backend Build and Test') {
             steps {
                 withCredentials([
@@ -51,25 +72,34 @@ pipeline {
                     dir('backend') {
                         sh '''
                             echo "Building Spring Boot backend..."
+
                             mvn clean package
+
+                            echo "Backend build completed."
                         '''
                     }
                 }
             }
         }
 
+        // Stage 4: Build React frontend
         stage('Frontend Build') {
             steps {
                 sh '''
                     echo "Installing frontend dependencies..."
+
                     npm ci
 
                     echo "Building React frontend..."
+
                     npm run build
+
+                    echo "Frontend build completed."
                 '''
             }
         }
 
+        // Stage 5: Build Docker images
         stage('Build Docker Images') {
             steps {
                 sh '''
@@ -102,6 +132,7 @@ pipeline {
             }
         }
 
+        // Stage 6: Push Docker images to Azure ACR
         stage('Push Images to Azure ACR') {
             steps {
                 withCredentials([
@@ -135,23 +166,24 @@ pipeline {
 
                         docker logout ${ACR_LOGIN_SERVER}
 
-                        echo "Images pushed successfully!"
+                        echo "Both images pushed successfully!"
                     '''
                 }
             }
         }
     }
 
+    // Post-build actions
     post {
         success {
             echo '''
             ==========================================
             SPENDWISE CI/CD PIPELINE SUCCESSFUL!
             ==========================================
-            Backend built and tested.
-            Frontend built successfully.
-            Docker images created.
-            Docker images pushed to Azure ACR.
+            Backend build and test completed.
+            Frontend build completed.
+            Docker images built successfully.
+            Images pushed to Azure Container Registry.
             ==========================================
             '''
         }
@@ -161,8 +193,7 @@ pipeline {
             ==========================================
             SPENDWISE CI/CD PIPELINE FAILED!
             ==========================================
-            Please check the Jenkins Console Output
-            for the stage that caused the failure.
+            Check Jenkins Console Output for errors.
             ==========================================
             '''
         }
