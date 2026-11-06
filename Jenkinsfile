@@ -2,20 +2,15 @@
 pipeline {
     agent any
 
-    options {
-        timestamps()
-        disableConcurrentBuilds()
-    }
-
     environment {
-        PATH = "/opt/homebrew/bin:/opt/homebrew/opt/openjdk@21/bin:/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        ACR_LOGIN_SERVER = 'spendwiseacr2026.azurecr.io'
+        BACKEND_IMAGE = 'spendwiseacr2026.azurecr.io/spendwise-backend'
+        FRONTEND_IMAGE = 'spendwiseacr2026.azurecr.io/spendwise-frontend'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                echo 'Pulling SpendWise source code from GitHub...'
                 checkout scm
             }
         }
@@ -23,12 +18,10 @@ pipeline {
         stage('Check Tools') {
             steps {
                 sh '''
-                    echo "Checking installed tools..."
-
                     java -version
                     mvn -version
-                    node --version
-                    npm --version
+                    node -version
+                    npm -version
                     docker --version
                 '''
             }
@@ -43,10 +36,7 @@ pipeline {
                     )
                 ]) {
                     dir('backend') {
-                        sh '''
-                            echo "Building and testing Spring Boot backend..."
-                            mvn clean test
-                        '''
+                        sh 'mvn clean package'
                     }
                 }
             }
@@ -55,55 +45,57 @@ pipeline {
         stage('Frontend Build') {
             steps {
                 sh '''
-                    echo "Installing frontend dependencies..."
                     npm ci
-
-                    echo "Building React frontend..."
                     npm run build
                 '''
             }
         }
 
-        stage('Build Backend Docker Image') {
+        stage('Build Docker Images') {
             steps {
                 sh '''
-                    echo "Building backend Docker image..."
-
-                    docker build \
-                        -t spendwise-backend:${BUILD_NUMBER} \
-                        -t spendwise-backend:latest \
-                        ./backend
+                    docker build -t ${BACKEND_IMAGE}:${BUILD_NUMBER} ./backend
+                    docker build -t ${FRONTEND_IMAGE}:${BUILD_NUMBER} .
+                    docker tag ${BACKEND_IMAGE}:${BUILD_NUMBER} ${BACKEND_IMAGE}:latest
+                    docker tag ${FRONTEND_IMAGE}:${BUILD_NUMBER} ${FRONTEND_IMAGE}:latest
                 '''
             }
         }
 
-        stage('Build Frontend Docker Image') {
+        stage('Push Images to Azure ACR') {
             steps {
-                sh '''
-                    echo "Building frontend Docker image..."
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'spendwise-acr-credentials',
+                        usernameVariable: 'ACR_USERNAME',
+                        passwordVariable: 'ACR_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        echo "$ACR_PASSWORD" | docker login ${ACR_LOGIN_SERVER} \
+                            --username "$ACR_USERNAME" \
+                            --password-stdin
 
-                    docker build \
-                        -t spendwise-frontend:${BUILD_NUMBER} \
-                        -t spendwise-frontend:latest \
-                        -f Dockerfile .
-                '''
+                        docker push ${BACKEND_IMAGE}:${BUILD_NUMBER}
+                        docker push ${BACKEND_IMAGE}:latest
+
+                        docker push ${FRONTEND_IMAGE}:${BUILD_NUMBER}
+                        docker push ${FRONTEND_IMAGE}:latest
+
+                        docker logout ${ACR_LOGIN_SERVER}
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'SUCCESS: SpendWise CI/CD pipeline completed!'
-            echo 'Backend and frontend Docker images were created.'
+            echo 'SpendWise CI/CD pipeline completed. Docker images pushed to Azure ACR.'
         }
-
         failure {
-            echo 'FAILED: SpendWise pipeline encountered an error.'
-            echo 'Check the console output to identify the failed stage.'
-        }
-
-        always {
-            echo 'Pipeline execution finished.'
+            echo 'SpendWise CI/CD pipeline failed. Check the stage logs.'
         }
     }
 }
