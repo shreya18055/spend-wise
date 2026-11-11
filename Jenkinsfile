@@ -102,19 +102,19 @@ pipeline {
             }
         }
 
-        // Stage 5: Build Docker images
+        // Stage 5: Build Docker images for AKS (AMD64)
         stage('Build Docker Images') {
             steps {
                 sh '''
-                    echo "Building backend Docker image..."
+                    echo "Building backend Docker image for AMD64..."
 
-                    docker build \
+                    docker build --platform linux/amd64 \
                         -t ${BACKEND_IMAGE}:${BUILD_NUMBER} \
                         ./backend
 
-                    echo "Building frontend Docker image..."
+                    echo "Building frontend Docker image for AMD64..."
 
-                    docker build \
+                    docker build --platform linux/amd64 \
                         -t ${FRONTEND_IMAGE}:${BUILD_NUMBER} \
                         .
 
