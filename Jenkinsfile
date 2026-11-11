@@ -55,6 +55,9 @@ pipeline {
                     echo "Docker version:"
                     docker --version
 
+                    echo "Kubectl version:"
+                    kubectl version --client
+
                     echo "All tools checked successfully."
                 '''
             }
@@ -171,6 +174,54 @@ pipeline {
                 }
             }
         }
+
+        // Stage 7: Deploy application to Azure Kubernetes Service
+        stage('Deploy to AKS') {
+            steps {
+                sh '''
+                    set -e
+
+                    export KUBECONFIG=/Users/shreyanandagopal/.kube/config
+
+                    echo "=================================="
+                    echo "DEPLOYING SPENDWISE TO AKS"
+                    echo "=================================="
+
+                    echo "Checking AKS connection..."
+
+                    kubectl config current-context
+                    kubectl get nodes
+
+                    echo "Updating backend deployment..."
+
+                    kubectl set image deployment/backend \
+                        spendwise-backend=${BACKEND_IMAGE}:${BUILD_NUMBER} \
+                        -n spendwise
+
+                    echo "Updating frontend deployment..."
+
+                    kubectl set image deployment/frontend \
+                        spendwise-frontend=${FRONTEND_IMAGE}:${BUILD_NUMBER} \
+                        -n spendwise
+
+                    echo "Waiting for backend rollout..."
+
+                    kubectl rollout status deployment/backend \
+                        -n spendwise --timeout=180s
+
+                    echo "Waiting for frontend rollout..."
+
+                    kubectl rollout status deployment/frontend \
+                        -n spendwise --timeout=180s
+
+                    echo "Verifying deployments..."
+
+                    kubectl get deployments,pods -n spendwise
+
+                    echo "AKS deployment completed successfully!"
+                '''
+            }
+        }
     }
 
     // Post-build actions
@@ -184,6 +235,8 @@ pipeline {
             Frontend build completed.
             Docker images built successfully.
             Images pushed to Azure Container Registry.
+            Application deployed to Azure Kubernetes Service.
+            Deployment rollouts verified successfully.
             ==========================================
             '''
         }
