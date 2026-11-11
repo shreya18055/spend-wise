@@ -129,7 +129,7 @@ function AddTransactionModal({ onClose, onAdd }) {
     amount: "",
     category: "Food & Dining",
     type: "expense",
-    date: new Date().toISOString().slice(0, 10),
+    date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
   });
 
   const [saving, setSaving] = useState(false);
